@@ -113,11 +113,6 @@ app.get('/health', (req, res) => {
 const proxyOptions = (target) => ({
   target,
   changeOrigin: true,
-  selfHandleResponse: false,
-  pathRewrite: (path) => {
-    // Keep /api prefix for backend services
-    return path;
-  },
   onProxyReq: (proxyReq, req) => {
     // Add correlation ID
     proxyReq.setHeader('X-Correlation-ID', req.correlationId);
@@ -128,12 +123,11 @@ const proxyOptions = (target) => ({
     }
 
     // Fix for handling body data in POST/PUT/PATCH requests
-    if (req.body && (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH')) {
+    if (req.body && Object.keys(req.body).length > 0 && (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH')) {
       const bodyData = JSON.stringify(req.body);
       proxyReq.setHeader('Content-Type', 'application/json');
       proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
       proxyReq.write(bodyData);
-      proxyReq.end();
     }
 
     logger.debug(`Proxying ${req.method} ${req.path} to ${target}`);
