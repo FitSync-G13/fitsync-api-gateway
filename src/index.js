@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const jwt = require('jsonwebtoken');
 const logger = require('./config/logger');
-const { v4: uuidv4 } = require('crypto').randomUUID || require('uuid').v4;
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -29,6 +29,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Correlation ID middleware
 app.use((req, res, next) => {
@@ -46,10 +47,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiting
+// Rate limiting - Relaxed for development
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000, // 1 minute
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // 1000 requests per minute
   message: {
     success: false,
     error: {
@@ -59,6 +60,7 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'development' // Disable in development
 });
 
 app.use('/api/', limiter);
@@ -111,11 +113,12 @@ app.get('/health', (req, res) => {
 const proxyOptions = (target) => ({
   target,
   changeOrigin: true,
+  selfHandleResponse: false,
   pathRewrite: (path) => {
     // Keep /api prefix for backend services
     return path;
   },
-  onProxyReq: (proxyReq, req, res) => {
+  onProxyReq: (proxyReq, req) => {
     // Add correlation ID
     proxyReq.setHeader('X-Correlation-ID', req.correlationId);
 
@@ -124,9 +127,18 @@ const proxyOptions = (target) => ({
       proxyReq.setHeader('Authorization', req.headers.authorization);
     }
 
+    // Fix for handling body data in POST/PUT/PATCH requests
+    if (req.body && (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH')) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+      proxyReq.end();
+    }
+
     logger.debug(`Proxying ${req.method} ${req.path} to ${target}`);
   },
-  onProxyRes: (proxyRes, req, res) => {
+  onProxyRes: (proxyRes, req) => {
     logger.debug(`Received response from ${target}`, {
       status: proxyRes.statusCode,
       correlationId: req.correlationId
