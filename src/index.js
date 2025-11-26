@@ -151,6 +151,183 @@ const proxyOptions = (target) => ({
   }
 });
 
+// Composite endpoints (multi-service orchestration)
+const axios = require('axios');
+
+// Client Dashboard - aggregates data from multiple services
+app.get('/api/dashboard/client/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const token = req.headers.authorization;
+
+    // Verify user has permission (clients can only see their own dashboard)
+    if (req.user && req.user.role === 'client' && req.user.id !== id) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Cannot access other client dashboards' }
+      });
+    }
+
+    // Parallel requests to multiple services
+    const [profile, programs, bookings, analytics] = await Promise.allSettled([
+      axios.get(`${services.user}/api/users/${id}`, { headers: { Authorization: token } }),
+      axios.get(`${services.training}/api/programs?client_id=${id}&limit=5`, { headers: { Authorization: token } }),
+      axios.get(`${services.schedule}/api/bookings?client_id=${id}&status=scheduled&limit=5`, { headers: { Authorization: token } }),
+      axios.get(`${services.progress}/api/analytics/client/${id}`, { headers: { Authorization: token } })
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        profile: profile.status === 'fulfilled' ? profile.value.data.data : null,
+        active_programs: programs.status === 'fulfilled' ? programs.value.data.data : [],
+        upcoming_bookings: bookings.status === 'fulfilled' ? bookings.value.data.data : [],
+        progress_summary: analytics.status === 'fulfilled' ? analytics.value.data.data : null
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Client dashboard error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'DASHBOARD_ERROR', message: 'Failed to load dashboard' }
+    });
+  }
+});
+
+// Trainer Dashboard - aggregates trainer-specific data
+app.get('/api/dashboard/trainer/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const token = req.headers.authorization;
+
+    // Verify user has permission
+    if (req.user && req.user.role === 'trainer' && req.user.id !== id) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Cannot access other trainer dashboards' }
+      });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Parallel requests
+    const [profile, programs, todayBookings, clients] = await Promise.allSettled([
+      axios.get(`${services.user}/api/users/${id}`, { headers: { Authorization: token } }),
+      axios.get(`${services.training}/api/programs?trainer_id=${id}&status=active&limit=10`, { headers: { Authorization: token } }),
+      axios.get(`${services.schedule}/api/bookings?trainer_id=${id}&limit=20`, { headers: { Authorization: token } }),
+      axios.get(`${services.user}/api/users?role=client&limit=50`, { headers: { Authorization: token } })
+    ]);
+
+    // Filter today's bookings
+    let todaySchedule = [];
+    if (todayBookings.status === 'fulfilled') {
+      todaySchedule = todayBookings.value.data.data.filter(b =>
+        b.booking_date === today || new Date(b.booking_date).toISOString().split('T')[0] === today
+      );
+    }
+
+    res.json({
+      success: true,
+      data: {
+        profile: profile.status === 'fulfilled' ? profile.value.data.data : null,
+        active_clients: programs.status === 'fulfilled' ? programs.value.data.data.length : 0,
+        today_schedule: todaySchedule,
+        recent_programs: programs.status === 'fulfilled' ? programs.value.data.data : []
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Trainer dashboard error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'DASHBOARD_ERROR', message: 'Failed to load dashboard' }
+    });
+  }
+});
+
+// Admin Dashboard - system overview
+app.get('/api/dashboard/admin', verifyToken, async (req, res) => {
+  try {
+    const token = req.headers.authorization;
+
+    // Verify admin role
+    if (req.user && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Admin access required' }
+      });
+    }
+
+    // Parallel requests for system stats
+    const [users, trainers, clients, programs] = await Promise.allSettled([
+      axios.get(`${services.user}/api/users?limit=1`, { headers: { Authorization: token } }),
+      axios.get(`${services.user}/api/users?role=trainer&limit=1`, { headers: { Authorization: token } }),
+      axios.get(`${services.user}/api/users?role=client&limit=1`, { headers: { Authorization: token } }),
+      axios.get(`${services.training}/api/programs?limit=1`, { headers: { Authorization: token } })
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        total_users: users.status === 'fulfilled' ? users.value.data.pagination?.total_count || 0 : 0,
+        total_trainers: trainers.status === 'fulfilled' ? trainers.value.data.pagination?.total_count || 0 : 0,
+        total_clients: clients.status === 'fulfilled' ? clients.value.data.pagination?.total_count || 0 : 0,
+        total_programs: programs.status === 'fulfilled' ? programs.value.data.pagination?.total_count || 0 : 0
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Admin dashboard error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'DASHBOARD_ERROR', message: 'Failed to load dashboard' }
+    });
+  }
+});
+
+// Booking creation with validation - orchestrates multiple services
+app.post('/api/bookings/validated', verifyToken, async (req, res) => {
+  try {
+    const token = req.headers.authorization;
+    const { trainer_id, client_id, booking_date, start_time, end_time, type, gym_id, notes } = req.body;
+
+    // Validate trainer exists
+    const trainerCheck = await axios.get(`${services.user}/api/users/${trainer_id}`, {
+      headers: { Authorization: token }
+    }).catch(() => null);
+
+    if (!trainerCheck || trainerCheck.data.data.role !== 'trainer') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_TRAINER', message: 'Invalid trainer ID' }
+      });
+    }
+
+    // Create booking
+    const booking = await axios.post(`${services.schedule}/api/bookings`, {
+      trainer_id,
+      booking_date,
+      start_time,
+      end_time,
+      type,
+      gym_id,
+      notes
+    }, { headers: { Authorization: token } });
+
+    res.status(201).json(booking.data);
+  } catch (error) {
+    logger.error('Validated booking creation error:', error);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({
+      success: false,
+      error: { code: 'BOOKING_FAILED', message: 'Failed to create booking' }
+    });
+  }
+});
+
 // Route definitions
 const routes = [
   // User Service
