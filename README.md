@@ -144,6 +144,68 @@ The API Gateway exposes the following routes:
 - `/api/progress/*` - Metrics & analytics (Progress Service)
 - `/api/notifications/*` - Notifications (Notification Service)
 
+## Testing
+
+This service uses Jest for unit testing.
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage report
+npm run test:coverage
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run specific test file
+npm test -- tests/unit/tokenVerification.test.js
+```
+
+### Test Structure
+
+```
+tests/
+├── setup.js                          # Test environment configuration
+└── unit/
+    ├── tokenVerification.test.js     # JWT verification tests (20 tests)
+    ├── rateLimiting.test.js          # Rate limiting tests (24 tests)
+    └── dashboardAggregation.test.js  # Dashboard logic tests (25 tests)
+```
+
+### Test Coverage
+
+The test suite covers:
+
+#### Token Verification (`tokenVerification.test.js`)
+- **Token Extraction** - Header parsing, Bearer prefix validation
+- **Valid Token Processing** - Decoding, role handling, claim verification
+- **Invalid Token Handling** - Expired, invalid signature, wrong issuer/audience, malformed
+- **Token Payload Variations** - Custom claims, minimal payloads
+- **JWT Helper Functions** - Token generation and verification
+
+#### Rate Limiting (`rateLimiting.test.js`)
+- **Configuration Options** - Window, max requests, headers, skip function
+- **Custom Values** - Environment variable overrides
+- **Error Responses** - Rate limit exceeded message structure
+- **Environment-based Bypass** - Development/production/test mode behavior
+- **Headers** - Standard vs legacy rate limit headers
+
+#### Dashboard Aggregation (`dashboardAggregation.test.js`)
+- **Client Dashboard** - Multi-service aggregation, partial failure handling
+- **Trainer Dashboard** - Today's schedule filtering, active client counting
+- **Admin Dashboard** - Pagination count extraction, total statistics
+- **Access Control** - Role-based dashboard access (client, trainer, admin)
+- **Response Structure** - Success flags, timestamps, error formats
+
+### Current Test Status
+
+- **Total Tests:** 69
+- **Passing:** 69
+- **Coverage Areas:** Token verification, rate limiting, dashboard aggregation, access control
+
 ## More Information
 
 - See [fitsync-docker-compose](https://github.com/FitSync-G13/fitsync-docker-compose) for complete setup documentation
