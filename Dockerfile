@@ -1,13 +1,36 @@
+# ---------------------------------------
+# Stage 1: Builder
+# ---------------------------------------
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy manifests first to cache dependencies
+COPY package*.json ./
+
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# ---------------------------------------
+# Stage 2: Runtime
+# ---------------------------------------
 FROM node:18-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+# Set production environment
+ENV NODE_ENV=production
 
-RUN npm install
+# Use the built-in "node" user (UID 1000)
+USER node
 
-COPY . .
+# Copy dependencies and code from builder
+COPY --from=builder --chown=node:node /app .
 
+# Expose the port the API Gateway listens on
 EXPOSE 4000
 
-CMD ["npm", "run", "dev"]
+# Use "npm start" for production.
+CMD ["npm", "start"]
