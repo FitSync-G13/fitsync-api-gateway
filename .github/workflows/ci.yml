@@ -12,14 +12,16 @@ permissions:
   security-events: write   # Required for uploading Trivy scan results
 
 jobs:
-  build-test:
+  build-test-push:
     uses: FitSync-G13/fitsync-cd-templates/.github/workflows/ci-test-build-push.yml@master
     with:
-      service_name: api-gateway-service
-      ecr_repository: fitsync-api-gateway
+      service_name: user-service
+      ecr_repository: fitsync-user-service
       aws_region: us-east-2
       language: 'node'
       node_version: '18'
-      push_image: false
-    # secrets:
-    #   AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      push_image: true
+      run_tests: true
+      fail_on_vulnerabilities: false
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
