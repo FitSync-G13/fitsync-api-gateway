@@ -15,8 +15,8 @@ jobs:
   build-test-push:
     uses: FitSync-G13/fitsync-cd-templates/.github/workflows/ci-test-build-push.yml@master
     with:
-      service_name: user-service
-      ecr_repository: fitsync-user-service
+      service_name: api-gateway-service
+      ecr_repository: fitsync-api-gateway
       aws_region: us-east-2
       language: 'node'
       node_version: '18'
