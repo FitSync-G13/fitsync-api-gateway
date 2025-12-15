@@ -137,12 +137,12 @@ docker compose down
 
 The API Gateway exposes the following routes:
 
-- `/api/auth/*` - Authentication (User Service)
-- `/api/users/*` - User management (User Service)
-- `/api/training/*` - Workouts & exercises (Training Service)
-- `/api/schedule/*` - Bookings (Schedule Service)
-- `/api/progress/*` - Metrics & analytics (Progress Service)
-- `/api/notifications/*` - Notifications (Notification Service)
+- `/api/auth/*`             - Authentication (User Service)
+- `/api/users/*`            - User management (User Service)
+- `/api/training/*`         - Workouts & exercises (Training Service)
+- `/api/schedule/*`         - Bookings (Schedule Service)
+- `/api/progress/*`         - Metrics & analytics (Progress Service)
+- `/api/notifications/*`    - Notifications (Notification Service)
 
 ## Testing
 
