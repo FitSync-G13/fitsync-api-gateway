@@ -45,7 +45,7 @@ git clone https://github.com/FitSync-G13/fitsync-frontend.git
 ```bash
 cd fitsync-docker-compose
 
-# Linux/Mac
+# Linux / Mac
 ./setup.sh
 
 # Windows
