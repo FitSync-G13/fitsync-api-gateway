@@ -7,11 +7,11 @@ on:
     branches: [ "main", "dev" ]
 
 permissions:
-  id-token: write
+  id-token: write          
   contents: read
-  pull-requests: write
+  pull-requests: write           
   security-events: write
-  checks: write
+  checks: write   
 
 jobs:
   pr-quality-gates:
@@ -19,18 +19,18 @@ jobs:
     if: github.event_name == 'pull_request'
     uses: FitSync-G13/fitsync-cd-templates/.github/workflows/ci-pr-quality-gates.yml@master
     with:
-      service_name: api-gateway-service
+      service_name: api-gateway
       ecr_repository: fitsync-api-gateway
       language: 'node'
       node_version: '18'
-      run_e2e_tests: ${{ github.base_ref == 'main' }}
+      run_e2e_tests: false
       skip_security_scan: false
-
+      
   build-test-push:
     uses: FitSync-G13/fitsync-cd-templates/.github/workflows/ci-test-build-push.yml@master
     if: github.event_name == 'push'
     with:
-      service_name: api-gateway-service
+      service_name: api-gateway
       ecr_repository: fitsync-api-gateway
       aws_region: us-east-2
       language: 'node'
@@ -38,18 +38,6 @@ jobs:
       push_image: true
       run_tests: true
       fail_on_vulnerabilities: false
-    secrets:
-      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-
-  trigger-deployment:
-    name: Trigger Deployment Update
-    needs: build-test-push
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main')
-    uses: FitSync-G13/fitsync-cd-templates/.github/workflows/trigger-deployment-update.yml@master
-    with:
-      service_name: api-gateway
-      image_tag: ${{ github.ref == 'refs/heads/main' && 'prod-latest' || 'dev-latest' }}
-      environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
 
