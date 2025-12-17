@@ -1,6 +1,7 @@
 # FitSync API Gateway
 
-The API Gateway for the FitSync multi-repository application. This service routes requests to the appropriate microservices and handles cross-cutting concerns like authentication, rate limiting, and request aggregation.
+The API Gateway for the FitSync multi-repository application. 
+This service routes requests to the appropriate microservices and handles cross-cutting concerns like authentication, rate limiting, and request aggregation.
 
 ## Features
 
