@@ -23,7 +23,7 @@ jobs:
       ecr_repository: fitsync-api-gateway
       language: 'node'
       node_version: '18'
-      run_e2e_tests: false
+      run_e2e_tests: true
       skip_security_scan: false
       
   build-test-push:
